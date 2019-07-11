@@ -1,4 +1,7 @@
 /*
+
+fft based pitch shifting
+Algorithm is based on dafx - U. Zoelzer page 279 ff, block-by-block pitch shifting apporach w/ resampling
  ____  _____ _        _    
 | __ )| ____| |      / \   
 |  _ \|  _| | |     / _ \  
@@ -9,32 +12,15 @@ The platform for ultra-low latency audio and sensor processing
 
 http://bela.io
 
-A project of the Augmented Instruments Laboratory within the
-Centre for Digital Music at Queen Mary University of London.
-http://www.eecs.qmul.ac.uk/~andrewm
-
-(c) 2016 Augmented Instruments Laboratory: Andrew McPherson,
-    Astrid Bin, Liam Donovan, Christian Heinrichs, Robert Jack,
-    Giulio Moro, Laurel Pardue, Victor Zappi. All rights reserved.
-
 The Bela software is distributed under the GNU Lesser General Public License
 (LGPL 3.0), available here: https://www.gnu.org/licenses/lgpl-3.0.txt
 */
-
-// Simple Delay on Audio Input with Low Pass Filter
 
 #include <Bela.h>
 #include <ne10/NE10.h>					// NEON FFT library
 #include <Midi.h>
 #include <math.h>
 #include <stdio.h>
-#if 0
-// User defined structure to pass between main and rendere complex data retrieved from file
-struct SampleData {
-	float *samples;	// Samples in file
-	int sampleLen;	// Total nume of samples
-};
-#endif
 
 #define BUFFER_SIZE (16384)
 
@@ -50,8 +36,8 @@ int gSampleCount = 0;
 // These variables used internally in the example:
 int gFFTSize = 2048;
 // phase parameters
-int Ha = gFFTSize/4-0;
-int Hs = gFFTSize/4;
+int Ha = gFFTSize/4-0; /* analysis hopsize */
+int Hs = gFFTSize/4;   /* synthisis hopsize */
 int gHopSize = Hs;
 int gPeriod = gHopSize;
 float tstretch = 1.0f;
@@ -63,7 +49,7 @@ float gFFTScaleFactor = 0;
 float *gInputAudio = NULL;
 float *gWindowBuffer;
 
-void process_fft_background();
+void process_pitch_shift_background(void *);
 
 // FFT vars
 ne10_fft_cpx_float32_t* timeDomainIn;
@@ -72,8 +58,6 @@ ne10_fft_cpx_float32_t* frequencyDomain;
 ne10_fft_cfg_float32_t cfg;
 
 // phase processing vars
-float *Y1;
-float *Y1_;
 float *deltaPhi;
 float *phi0;
 float *phi;
@@ -84,9 +68,6 @@ float *amplitude;
 // Set the analog channels to read from
 const int gAnalogIn = 0;
 int gAudioFramesPerAnalogFrame = 0;
-
-// Sample info
-//SampleData gSampleData;	// User defined structure to get complex data from main
 
 int gReadPtr = 0;		// Position of last read sample from file
 AuxiliaryTask gFFTTask;
@@ -102,7 +83,6 @@ int gFFTOutputBufferPointer = 0;
 // Return true on success; returning false halts the program.
 bool setup(BelaContext* context, void* userData)
 {
-	//context->audioSampleRate = 22050.0f; // unfortunetaly CONST
     printf("go setup\n");
 	printf("context->audioFrames = %d\n", context->audioFrames);
 	printf("context->audioSampleRate = %f\n", context->audioSampleRate);
@@ -114,13 +94,10 @@ bool setup(BelaContext* context, void* userData)
 		printf("Error: for this project, you need the same number of input and output channels.\n");
 		return false;
 	}
-	
-	// Retrieve a parameter passed in from the initAudio() call
-//	gSampleData = *(SampleData *)userData; /* this causes seg fault */
 
 	gFFTScaleFactor = 1.0f / (float)gFFTSize;
-    gOutputBufferWritePointer = Hs;//gHopSize;//0;//
-	gOutputBufferReadPointer = 0;//(-gHopSize + BUFFER_SIZE) % BUFFER_SIZE;
+    gOutputBufferWritePointer = Hs;
+	gOutputBufferReadPointer = 0;
 
 	timeDomainIn = (ne10_fft_cpx_float32_t*) NE10_MALLOC (gFFTSize * sizeof (ne10_fft_cpx_float32_t));
 	timeDomainOut = (ne10_fft_cpx_float32_t*) NE10_MALLOC (gFFTSize * sizeof (ne10_fft_cpx_float32_t));
@@ -132,11 +109,7 @@ bool setup(BelaContext* context, void* userData)
 	memset(gOutputBuffer, 0, BUFFER_SIZE * sizeof(float));
     memset(gInputBuffer, 0, BUFFER_SIZE * sizeof(float));
 
-
 	// Allocate phase processing buffer and init vars
-	Y1 = (float *)malloc(gFFTSize * sizeof(float));
-	if(Y1 == 0)
-		return false;
 	psi = (float *)malloc(gFFTSize * sizeof(float));
 	if(psi == 0)
 		return false;
@@ -175,7 +148,7 @@ bool setup(BelaContext* context, void* userData)
 	}
 
 	// Initialise auxiliary tasks
-	if((gFFTTask = Bela_createAuxiliaryTask(&process_fft_background, 90, "fft-calculation")) == 0)
+	if((gFFTTask = Bela_createAuxiliaryTask(&process_pitch_shift_background, 90, "fft-calculation")) == 0)
 		return false;
 
 
@@ -196,9 +169,8 @@ float princarg(float phase){
     return fmod(phase + M_PI, -2*M_PI) + M_PI;
 }
 
-// This function handles the FFT processing in this example once the buffer has
-// been assembled.
-void process_fft(float *inBuffer, int inWritePointer, float *outBuffer, int outWritePointer)
+// This function handles the FFT based pitch shifting processing
+void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, int outWritePointer)
 {
 	// Copy buffer into FFT input
 	int pointer = (inWritePointer - gFFTSize + BUFFER_SIZE) % BUFFER_SIZE;
@@ -217,12 +189,10 @@ void process_fft(float *inBuffer, int inWritePointer, float *outBuffer, int outW
     for(int n = 0; n < gFFTSize; n++) {
 		amplitude[n] = sqrtf(frequencyDomain[n].r * frequencyDomain[n].r + frequencyDomain[n].i * frequencyDomain[n].i);
 		phi[n] = atan2(frequencyDomain[n].i, frequencyDomain[n].r); //rand()/(float)RAND_MAX * 2.f* M_PI;
-		//frequencyDomain[n].r = cosf(phase) * amplitude;
-		//frequencyDomain[n].i = sinf(phase) * amplitude;
 	}
 	
-#if 1
 /*
+  Algorithm is based on dafx - U. Zoelzer page 279 ff, block-by-block pitch shifting apporach w/ resampling
   phi = atan2(imag(Y1), real(Y1)); % arg(Y1); %
   a = sqrt(real(Y1).*real(Y1) + imag(Y1).*imag(Y1)); % abs(Y1);
   deltaPhi = omega + princarg(phi-phi0-omega);
@@ -252,14 +222,8 @@ void process_fft(float *inBuffer, int inWritePointer, float *outBuffer, int outW
 	if(pitch){
 		for(int n = 0; n < gFFTSize; n++) {
 			timeDomainOut[n].r = timeDomainOut[n].r * gWindowBuffer[n];
-			//timeDomainOut[n].i = 0f; // not zero?
 		}
 	}
-
-#else
-	// Run the inverse FFT
-	ne10_fft_c2c_1d_float32_neon (timeDomainOut, frequencyDomain, cfg, 1);
-#endif
 
 /*
 % for linear interpolation of a grain of length N
@@ -296,12 +260,10 @@ grain3 = grain2(ix) .* dx1 + grain2(ix1) .* dx;
 	}
 }
 
-#if 1
 // Function to process the FFT in a thread at lower priority
-void process_fft_background() {
-	process_fft(gInputBuffer, gFFTInputBufferPointer, gOutputBuffer, gFFTOutputBufferPointer);
+void process_pitch_shift_background(void*) {
+	process_pitch_shift(gInputBuffer, gFFTInputBufferPointer, gOutputBuffer, gFFTOutputBufferPointer);
 }
-#endif
 
 void render(BelaContext *context, void *userData)
 {
@@ -316,10 +278,10 @@ void render(BelaContext *context, void *userData)
         // Read audio inputs
         inL = audioRead(context,n,0);
         inR = audioRead(context,n,1);
-#if 1
+#if 1 // apply pitch shifting if defined. otherwise it's bypassed
 		gInputBuffer[gInputBufferPointer] = (inR+inL) * 0.5f;
 			
-		outL = gOutputBuffer[gOutputBufferReadPointer];// * 128.0f;
+		outL = gOutputBuffer[gOutputBufferReadPointer];
 		outR = outL;
 		
 		// Clear the output sample in the buffer so it is ready for the next overlap-add
@@ -339,9 +301,9 @@ void render(BelaContext *context, void *userData)
 			
 		gSampleCount++;
 		if(gSampleCount >= Hs) {
-			//gOutputBufferWritePointer = fmod(gOutputBufferWritePointer+Hs, BUFFER_SIZE);
 #if 0
-			process_fft(gInputBuffer, gInputBufferPointer, gOutputBuffer, gOutputBufferWritePointer);
+			/* do not use scheduling */
+			process_pitch_shift(gInputBuffer, gInputBufferPointer, gOutputBuffer, gOutputBufferWritePointer);
 #else
 			gFFTInputBufferPointer = gInputBufferPointer;
 			gFFTOutputBufferPointer = gOutputBufferWritePointer;
@@ -357,7 +319,6 @@ void render(BelaContext *context, void *userData)
 		audioWrite(context, n, 0, outL);
         audioWrite(context, n, 1, outR);
     }
-	//gHopSize = gPeriod;
 }
 
 // cleanup_render() is called once at the end, after the audio has stopped.
@@ -371,7 +332,6 @@ void cleanup(BelaContext* context, void* userData)
 	NE10_FREE(cfg);
 	free(gInputAudio);
 	free(gWindowBuffer);
-	free(Y1);
 	free(psi);
 	free(phi);
 	free(amplitude);
