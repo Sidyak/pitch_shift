@@ -1,5 +1,6 @@
 clear
 clc
+close all
 
 [y, fs] = audioread('batman.wav');
 %Y = fft(y);
