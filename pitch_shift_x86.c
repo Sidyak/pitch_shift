@@ -57,7 +57,9 @@ const int gAnalogIn = 0;
 int gAudioFramesPerAnalogFrame = 0;
 
 int gReadPtr = 0;        // Position of last read sample from file
+#if 0 // TODO
 AuxiliaryTask gFFTTask;
+#endif
 int gFFTInputBufferPointer = 0;
 int gFFTOutputBufferPointer = 0;
 
@@ -142,7 +144,7 @@ bool setup(BelaContext* context, void* userData)
 
     // Check if analog channels are enabled
     if(context->analogFrames == 0 || context->analogFrames > context->audioFrames) {
-        rt_printf("Error: this example needs analog enabled, with 4 or 8 channels\n");
+        printf("Error: this example needs analog enabled, with 4 or 8 channels\n");
         return false;
     }
     // Useful calculations
@@ -162,6 +164,7 @@ void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, 
 {
     // Copy buffer into FFT input
     int pointer = (inWritePointer - gFFTSize + BUFFER_SIZE) % BUFFER_SIZE;
+#if 0 // TODO
     for(int n = 0; n < gFFTSize; n++) {
         timeDomainIn[n].r = (ne10_float32_t) inBuffer[pointer] * gWindowBuffer[n];
         timeDomainIn[n].i = 0.0f;
@@ -170,14 +173,15 @@ void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, 
         if(pointer >= BUFFER_SIZE)
             pointer = 0;
     }
-#if 0 // TODO
+
     // Run the FFT
     ne10_fft_c2c_1d_float32_neon (frequencyDomain, timeDomainIn, cfg, 0);
-#endif
+
     for(int n = 0; n < gFFTSize; n++) {
         amplitude[n] = sqrtf(frequencyDomain[n].r * frequencyDomain[n].r + frequencyDomain[n].i * frequencyDomain[n].i);
         phi[n] = atan2(frequencyDomain[n].i, frequencyDomain[n].r); //rand()/(float)RAND_MAX * 2.f* M_PI;
     }
+#endif
     
 /*
   Algorithm is based on dafx - U. Zoelzer page 279 ff, block-by-block pitch shifting apporach w/ resampling
@@ -201,16 +205,22 @@ void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, 
           phi0[n] = phi[n];
           psi[n] = princarg(psi[n]+deltaPhi[n]*tstretch); 
           //Y1_[n] = amplitude[n] .* exp(1i*(psi[n]));
+#if 0 // TODO
           frequencyDomain[n].r = cosf(psi[n]) * amplitude[n];
           frequencyDomain[n].i = sinf(psi[n]) * amplitude[n];
+#endif
           //y1_[n] = fftshift(real(ifft(Y1_, N)));
     }
+#if 0 // TODO
     ne10_fft_c2c_1d_float32_neon (timeDomainOut, frequencyDomain, cfg, 1);
+#endif
     //y1_[n] = fftshift(real(ifft(Y1_, N))) .* w[n]';
     if(pitch){
+#if 0 // TODO
         for(int n = 0; n < gFFTSize; n++) {
             timeDomainOut[n].r = timeDomainOut[n].r * gWindowBuffer[n];
         }
+#endif
     }
 
 /*
@@ -236,12 +246,14 @@ grain3 = grain2(ix) .* dx1 + grain2(ix1) .* dx;
         int ix1 = ix+1;
         float dx = x-(float)ix;
         float dx1 = 1.0f-dx;
+#if 0 // TODO
         outBuffer[pointer] += (timeDomainOut[ix].r * dx1 + timeDomainOut[ix1].r * dx);
+#endif
         //outBuffer[pointer] += (timeDomainOut[n].r);// * gFFTScaleFactor;
         //if(timeDomainOut[n].i != 0)
-        //    rt_printf("timeDomainOut[n].i not zero \n");        
+        //    printf("timeDomainOut[n].i not zero \n");
         if(isnan(outBuffer[pointer]))
-            rt_printf("outBuffer OLA\n");
+            printf("outBuffer OLA\n");
         pointer++;
         if(pointer >= BUFFER_SIZE)
             pointer = 0;
@@ -252,9 +264,10 @@ grain3 = grain2(ix) .* dx1 + grain2(ix1) .* dx;
 void process_pitch_shift_background(void*) {
     process_pitch_shift(gInputBuffer, gFFTInputBufferPointer, gOutputBuffer, gFFTOutputBufferPointer);
 }
-#if 0 // TODO
-void render(BelaContext *context, void *userData)
+
+int main(void)
 {
+#if 0 // TODO
     // iterate over the audio frames and create three oscillators, seperated in phase by PI/2
     for(unsigned int n = 0; n < context->audioFrames; n++) {
         if(gAudioFramesPerAnalogFrame && !(n % gAudioFramesPerAnalogFrame)) {
@@ -307,12 +320,13 @@ void render(BelaContext *context, void *userData)
         audioWrite(context, n, 0, outL);
         audioWrite(context, n, 1, outR);
     }
-}
 #endif
+	return 0;
+}
 // cleanup_render() is called once at the end, after the audio has stopped.
 // Release any resources that were allocated in initialise_render().
 
-void cleanup(BelaContext* context, void* userData)
+void cleanup()
 {
 #if 0 // TODO
     NE10_FREE(timeDomainIn);
