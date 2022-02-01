@@ -92,6 +92,7 @@ bool setup(BelaContext* context, void* userData)
     timeDomainIn = (ne10_fft_cpx_float32_t*) NE10_MALLOC (gFFTSize * sizeof (ne10_fft_cpx_float32_t));
     timeDomainOut = (ne10_fft_cpx_float32_t*) NE10_MALLOC (gFFTSize * sizeof (ne10_fft_cpx_float32_t));
     frequencyDomain = (ne10_fft_cpx_float32_t*) NE10_MALLOC (gFFTSize * sizeof (ne10_fft_cpx_float32_t));
+	// https://community.vcvrack.com/t/complete-list-of-c-c-fft-libraries/9153
     cfg = ne10_fft_alloc_c2c_float32_neon (gFFTSize);
     
     memset(timeDomainIn, 0, gFFTSize * sizeof (ne10_fft_cpx_float32_t));
@@ -174,7 +175,7 @@ void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, 
             pointer = 0;
     }
 
-    // Run the FFT
+    // Run the FFT https://community.vcvrack.com/t/complete-list-of-c-c-fft-libraries/9153
     ne10_fft_c2c_1d_float32_neon (frequencyDomain, timeDomainIn, cfg, 0);
 
     for(int n = 0; n < gFFTSize; n++) {
