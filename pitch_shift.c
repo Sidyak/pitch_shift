@@ -2,6 +2,7 @@
 
 fft based pitch shifting
 Algorithm is based on dafx - U. Zoelzer page 279 ff, block-by-block pitch shifting apporach w/ resampling
+Project is deployed on 
  ____  _____ _        _    
 | __ )| ____| |      / \   
 |  _ \|  _| | |     / _ \  
