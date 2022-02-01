@@ -43,6 +43,7 @@ ne10_fft_cpx_float32_t* timeDomainOut;
 ne10_fft_cpx_float32_t* frequencyDomain;
 ne10_fft_cfg_float32_t cfg;
 #endif
+
 // phase processing vars
 float *deltaPhi;
 float *phi0;
