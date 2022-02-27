@@ -16,7 +16,7 @@ Project is deployed on x86
 
 extern "C" {
     #include "wavreader.h"
-	#include "wavwriter.h"
+    #include "wavwriter.h"
 }
 
 #define BUFFER_SIZE (16384)
@@ -104,7 +104,7 @@ bool setup(BelaContext* context, void* userData)
     timeDomainIn = (ne10_fft_cpx_float32_t*) NE10_MALLOC (gFFTSize * sizeof (ne10_fft_cpx_float32_t));
     timeDomainOut = (ne10_fft_cpx_float32_t*) NE10_MALLOC (gFFTSize * sizeof (ne10_fft_cpx_float32_t));
     frequencyDomain = (ne10_fft_cpx_float32_t*) NE10_MALLOC (gFFTSize * sizeof (ne10_fft_cpx_float32_t));
-	// https://community.vcvrack.com/t/complete-list-of-c-c-fft-libraries/9153
+    // https://community.vcvrack.com/t/complete-list-of-c-c-fft-libraries/9153
     cfg = ne10_fft_alloc_c2c_float32_neon (gFFTSize);
     
     memset(timeDomainIn, 0, gFFTSize * sizeof (ne10_fft_cpx_float32_t));
@@ -274,66 +274,68 @@ grain3 = grain2(ix) .* dx1 + grain2(ix1) .* dx;
 }
 
 // Function to process the FFT in a thread at lower priority
-void process_pitch_shift_background(void*) {
+void process_pitch_shift_background(void*)
+{
     process_pitch_shift(gInputBuffer, gFFTInputBufferPointer, gOutputBuffer, gFFTOutputBufferPointer);
 }
 
-void usage(const char* name) {
-	fprintf(stderr, "%s in.wav out.wav\n", name);
+void usage(const char* name)
+{
+    fprintf(stderr, "%s in.wav out.wav\n", name);
 }
 
 int main(int argc, char *argv[])
 {
-
     const char *infile, *outfile;
     FILE *out;
-	void *wavIn;
+    void *wavIn;
     void *wavOut;
-	int format, sample_rate, channels, bits_per_sample;
+    int format, sample_rate, channels, bits_per_sample;
     uint32_t data_length;
     int input_size;
-	uint8_t* input_buf;
-	int16_t* convert_buf;
+    uint8_t* input_buf;
+    int16_t* convert_buf;
 
-	if (argc - optind < 2)
+    if (argc - optind < 2)
     {
         fprintf(stderr, "Error: not enough parameter provided\n");
-		usage(argv[0]);
-		return 1;
-	}
+        usage(argv[0]);
+        return 1;
+    }
     
-	infile = argv[optind];
-	outfile = argv[optind + 1];
+    infile = argv[optind];
+    outfile = argv[optind + 1];
 
-	wavIn = wav_read_open(infile);
-	if (!wavIn)
+    wavIn = wav_read_open(infile);
+    if (!wavIn)
     {
-		fprintf(stderr, "Unable to open wav file %s\n", infile);
-		return 1;
-	}
-	if (!wav_get_header(wavIn, &format, &channels, &sample_rate, &bits_per_sample, &data_length))
+        fprintf(stderr, "Unable to open wav file %s\n", infile);
+        return 1;
+    }
+    if (!wav_get_header(wavIn, &format, &channels, &sample_rate, &bits_per_sample, &data_length))
     {
-		fprintf(stderr, "Bad wav file %s\n", infile);
-		return 1;
-	}
-	if (format != 1)
+        fprintf(stderr, "Bad wav file %s\n", infile);
+        return 1;
+    }
+    if (format != 1)
     {
-		fprintf(stderr, "Unsupported WAV format %d\n", format);
-		return 1;
-	}
+        fprintf(stderr, "Unsupported WAV format %d\n", format);
+        return 1;
+    }
 
     wavOut = wav_write_open(outfile, sample_rate, bits_per_sample, channels);
 
-    if (!wavOut) {
+    if (!wavOut)
+    {
         fprintf(stderr, "Unable to open wav file for writing %s\n", infile);
         return 1;
     }
 
     int frameLength = data_length;
     
-	input_size = data_length;//channels*2*frameLength;//info.frameLength;
-	input_buf = (uint8_t*) malloc(input_size);
-	convert_buf = (int16_t*) malloc(input_size);
+    input_size = data_length;//channels*2*frameLength;//info.frameLength;
+    input_buf = (uint8_t*) malloc(input_size);
+    convert_buf = (int16_t*) malloc(input_size);
 
     if (input_buf == NULL || convert_buf == NULL)
     {
@@ -410,19 +412,21 @@ int main(int argc, char *argv[])
         wav_write_data(wavOut, (unsigned char*)&input_buf, input_size);
     }
 #endif
-	
+    
     free(input_buf);
-	free(convert_buf);
+    free(convert_buf);
 
-    if (wavOut) {
-    	wav_write_close(wavOut);
+    if (wavOut)
+    {
+        wav_write_close(wavOut);
     }
 
-    if (wavIn) {
-    	wav_read_close(wavIn);
+    if (wavIn)
+    {
+        wav_read_close(wavIn);
     }
 
-	return 0;
+    return 0;
 }
 // cleanup_render() is called once at the end, after the audio has stopped.
 // Release any resources that were allocated in initialise_render().
