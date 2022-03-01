@@ -294,7 +294,7 @@ int main(int argc, char *argv[])
     uint32_t data_length;
     int input_size;
     uint8_t* input_buf;
-    int16_t* convert_buf;
+//    int16_t* convert_buf;
 
     if (argc - optind < 2)
     {
@@ -335,9 +335,9 @@ int main(int argc, char *argv[])
     
     input_size = data_length;//channels*2*frameLength;//info.frameLength;
     input_buf = (uint8_t*) malloc(input_size);
-    convert_buf = (int16_t*) malloc(input_size);
+//    convert_buf = (int16_t*) malloc(input_size);
 
-    if (input_buf == NULL || convert_buf == NULL)
+    if (input_buf == NULL) // || convert_buf == NULL)
     {
         fprintf(stderr, "Unable to allocate memory for buffer\n");
         return 1;
@@ -407,24 +407,18 @@ int main(int argc, char *argv[])
         convert_buf[i] = in[0] | (in[1] << 8);
     }
 #endif
-    //for(unsigned int n = 0; n < frameLength; n++)
+    for(unsigned int n = 0; n < read; n++)
     {
-        wav_write_data(wavOut, (unsigned char*)&input_buf, input_size);
+        printf("%d ", input_buf[n]);
+        wav_write_data(wavOut, (unsigned char*)&input_buf[n], 1);
     }
 #endif
     
     free(input_buf);
-    free(convert_buf);
+//    free(convert_buf);
 
-    if (wavOut)
-    {
-        wav_write_close(wavOut);
-    }
-
-    if (wavIn)
-    {
-        wav_read_close(wavIn);
-    }
+    wav_write_close(wavOut);
+    wav_read_close(wavIn);
 
     return 0;
 }
