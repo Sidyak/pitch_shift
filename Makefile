@@ -1,6 +1,6 @@
 
 CC := g++
-CCFLAGS := -I. -Iinc/ -DFIXED_POINT=16
+CCFLAGS := -I. -Iinc/ -DFIXED_POINT=32
 DBGFLAGS := -g
 CCOBJFLAGS := $(CCFLAGS) -c
 
