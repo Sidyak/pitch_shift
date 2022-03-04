@@ -1,7 +1,11 @@
 /*
-fft based pitch shifting
-Algorithm is based on dafx - U. Zoelzer page 279 ff, block-by-block pitch shifting apporach w/ resampling
-Project is deployed on x86
+Author: Kim Radmacher
+
+Date: 04.03.2022
+
+Description:
+  FFT based pitch shifting. Algorithm is based on DAFX - U. Zoelzer page 279 ff, block-by-block pitch shifting apporach w/ resampling
+  Project is deployed on x86
 */
 
 #include <math.h>
