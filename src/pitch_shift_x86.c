@@ -52,12 +52,10 @@ int lx;
 float gFFTScaleFactor = 0;
 float *gWindowBuffer;
 
-#if 1
 // FFT vars
 kiss_fft_cpx* timeDomainIn;
 kiss_fft_cpx* timeDomainOut;
 kiss_fft_cpx* frequencyDomain;
-#endif
 
 kiss_fft_cfg fft_cfg;
 kiss_fft_cfg ifft_cfg;
@@ -84,47 +82,60 @@ bool setup(void)
     gFFTScaleFactor = 1.0f / (float)(1<<gFFTSize);
     gOutputBufferWritePointer = Hs;
     gOutputBufferReadPointer = 0;
-#if 1
+
     timeDomainIn = (kiss_fft_cpx*) malloc ((1<<gFFTSize) * sizeof (kiss_fft_cpx));
+    if(timeDomainIn == NULL)
+    {
+        return false;
+    }
     timeDomainOut = (kiss_fft_cpx*) malloc ((1<<gFFTSize) * sizeof (kiss_fft_cpx));
+    if(timeDomainOut == NULL)
+    {
+        return false;
+    }
     frequencyDomain = (kiss_fft_cpx*) malloc ((1<<gFFTSize) * sizeof (kiss_fft_cpx));
+    if(frequencyDomain == NULL)
+    {
+        return false;
+    }
+    
+    // list of fft c-implementations
     // https://community.vcvrack.com/t/complete-list-of-c-c-fft-libraries/9153
 
     memset(timeDomainIn, 0, (1<<gFFTSize) * sizeof (kiss_fft_cpx));
     memset(timeDomainOut, 0, (1<<gFFTSize) * sizeof (kiss_fft_cpx));
-#endif
 
     memset(gOutputBuffer, 0, BUFFER_SIZE * sizeof(int16_t));
     memset(gInputBuffer, 0, BUFFER_SIZE * sizeof(int16_t));
     
     // Allocate phase processing buffer and init vars
     psi = (float *)malloc((1<<gFFTSize) * sizeof(float));
-    if(psi == 0)
+    if(psi == NULL)
     {
         return false;
     }
     phi = (float *)malloc((1<<gFFTSize) * sizeof(float));
-    if(phi == 0)
+    if(phi == NULL)
     {
         return false;
     }
     amplitude = (float *)malloc((1<<gFFTSize) * sizeof(float));
-    if(amplitude == 0)
+    if(amplitude == NULL)
     {
         return false;
     }
     phi0 = (float *)malloc((1<<gFFTSize) * sizeof(float));
-    if(phi0 == 0)
+    if(phi0 == NULL)
     {
         return false;
     }
     deltaPhi = (float *)malloc((1<<gFFTSize) * sizeof(float));
-    if(deltaPhi == 0)
+    if(deltaPhi == NULL)
     {
         return false;
     }
     omega = (float *)malloc((1<<gFFTSize) * sizeof(float));
-    if(omega == 0)
+    if(omega == NULL)
     {
         return false;
     }
