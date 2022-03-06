@@ -21,10 +21,14 @@ Description:
 #include <unistd.h>
 #endif
 
+#ifdef __cplusplus
 extern "C" {
-    #include "wavreader.h"
-    #include "wavwriter.h"
+#endif
+#include "wavreader.h"
+#include "wavwriter.h"
+#ifdef __cplusplus
 }
+#endif
 
 #include "kissfft/kiss_fft.h"
 
