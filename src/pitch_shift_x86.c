@@ -399,7 +399,7 @@ int main(int argc, char *argv[])
             inL = (int32_t)convert_buf[n];///(1<<15);
             inR = inL;
         }
-        if(channels == 2)
+        else if(channels == 2)
         {
             // interleaved left right channel
             inL = (int32_t)convert_buf[n];///(1<<15);
