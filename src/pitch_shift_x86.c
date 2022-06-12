@@ -450,7 +450,10 @@ int main(int argc, char *argv[])
         int16_t oL = (int16_t)outL;
         int16_t oR = (int16_t)outR;
         wav_write_data(wavOut, (unsigned char*)&oL, 2);
-        wav_write_data(wavOut, (unsigned char*)&oR, 2);
+        if(channels > 1)
+        {
+            wav_write_data(wavOut, (unsigned char*)&oR, 2);
+        }
     }    
 
     free(convert_buf);
