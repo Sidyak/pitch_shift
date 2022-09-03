@@ -44,6 +44,7 @@ int gPeriod = gHopSize;
 float tstretch = 1.0f;
 float resample = 1.0f;
 int pitch = 0;
+int prevPitch = 0;
 int lx;
 
 float gFFTScaleFactor = 0;
@@ -207,6 +208,16 @@ void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, 
     y1_ = fftshift(real(ifft(Y1_, N))) .* w';
   end  
 */
+
+    // In case the pitch would change during processing phi0 and psi have to be recalculated. Otherwise artifacts arise.
+    if(prevPitch != pitch)
+    {
+        //rt_printf("psi reset cause pitch_offset changed from %d to %d\n", prevPitch, pitch);
+        prevPitch = pitch;
+        memset(phi0, 0, sizeof(phi0));
+        memset(psi, 0, sizeof(psi));
+    }
+    
     tstretch = (float)(Ha+pitch)/(float)Hs;
     resample = 1.0f/tstretch;
     for(int n = 0; n < gFFTSize; n++) {
@@ -291,7 +302,7 @@ void render(BelaContext *context, void *userData)
         gOutputBufferReadPointer++;
         if(gOutputBufferReadPointer >= (BUFFER_SIZE))
             gOutputBufferReadPointer = 0;
-            
+
         gOutputBufferWritePointer++;
         if(gOutputBufferWritePointer >= (BUFFER_SIZE))
             gOutputBufferWritePointer = 0;
@@ -299,7 +310,7 @@ void render(BelaContext *context, void *userData)
         gInputBufferPointer++;
         if(gInputBufferPointer >= (BUFFER_SIZE))
             gInputBufferPointer = 0;
-            
+
         gSampleCount++;
         if(gSampleCount >= Hs) {
 #if 0

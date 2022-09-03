@@ -173,8 +173,10 @@ float princarg(float phase)
     return fmod(phase + M_PI, -2*M_PI) + M_PI;
 }
 
+static int prevPOff = 0;
+
 // This function handles the FFT based pitch shifting processing
-void process_pitch_shift(int16_t *inBuffer, int inWritePointer, int16_t *outBuffer, int outWritePointer)
+void process_pitch_shift(int16_t *inBuffer, int inWritePointer, int16_t *outBuffer, int outWritePointer, int pitch_offset)
 {
     // Copy buffer into FFT input
     int pointer = (inWritePointer - (1<<gFFTSize) + BUFFER_SIZE) % BUFFER_SIZE;
@@ -215,7 +217,20 @@ void process_pitch_shift(int16_t *inBuffer, int inWritePointer, int16_t *outBuff
     y1_ = fftshift(real(ifft(Y1_, N))) .* w';
   end  
 */
-    tstretch = ((float)Ha+(float)pitch)/(float)Hs;
+
+    // In case the pitch would change during processing phi0 and psi have to be recalculated. Otherwise artifacts arise.
+    if(prevPOff != pitch_offset)
+    {
+        printf("psi reset cause pitch_offset changed from %d to %d\n", prevPOff, pitch_offset);
+        prevPOff = pitch_offset;
+        for(int n = 0; n < (1<<gFFTSize); n++)
+        {
+            phi0[n] = 0.f;
+            psi[n] = 0.f;
+        } 
+    }
+
+    tstretch = ((float)Ha+(float)(pitch+pitch_offset))/(float)Hs;
     resample = 1.0f/tstretch;
     
     for(int n = 0; n < (1<<gFFTSize); n++)
@@ -265,7 +280,12 @@ grain3 = grain2(ix) .* dx1 + grain2(ix1) .* dx;
     // Overlap-and-add timeDomainOut into the output buffer
     pointer = outWritePointer;
     lx = (int)floor((float)(1<<gFFTSize)*resample);
+    
     int n;
+    if(lx > BUFFER_SIZE)
+    {
+        printf("WARNING: absolute pitch value is too high for buffer size %d > %d\n",lx , BUFFER_SIZE);
+    }
     for(n = 0; n < lx/*(1<<gFFTSize)*/; n++)
     {
         float x = 0.0f + (float)n*((float)(1<<gFFTSize)/(float)lx);
@@ -275,7 +295,7 @@ grain3 = grain2(ix) .* dx1 + grain2(ix1) .* dx;
         float dx1 = 1.0f-dx;
 
         outBuffer[pointer] += (int16_t)((float)timeDomainIn[ix].r * dx1 + (float)timeDomainIn[ix1].r * dx);
-        //outBuffer[pointer] += (int16_t)(timeDomainIn[n].r);// * gFFTScaleFactor;
+	//outBuffer[pointer] += (int16_t)(timeDomainIn[n].r);// * gFFTScaleFactor;
 
 #ifdef DEBUG
         if(timeDomainIn[n].i != 0)
@@ -389,7 +409,7 @@ int main(int argc, char *argv[])
         const uint8_t* in = &input_buf[2*n];
         convert_buf[n] = in[0] | (in[1] << 8);
     }
-
+    int pitchOff = 0;
     // iterate over the audio frames and create three oscillators, seperated in phase by PI/2
     for(unsigned int n = 0; n < numSamples; n+=channels)
     {
@@ -438,7 +458,9 @@ int main(int argc, char *argv[])
         gSampleCount++;
         if(gSampleCount >= Hs)
         {
-            process_pitch_shift(gInputBuffer, gInputBufferPointer, gOutputBuffer, gOutputBufferWritePointer);
+            //if(n > numSamples/4 && n <= numSamples/2) pitchOff = pitch/2;
+            //if(n > (numSamples)/2) pitchOff = -pitch;
+            process_pitch_shift(gInputBuffer, gInputBufferPointer, gOutputBuffer, gOutputBufferWritePointer, pitchOff);
             gSampleCount = 0;
         }    
         
