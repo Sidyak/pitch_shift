@@ -18,10 +18,11 @@ The Bela software is distributed under the GNU Lesser General Public License
 */
 
 #include <Bela.h>
-#include <ne10/NE10.h>                    // NEON FFT library
-#include <Midi.h>
+#include <libraries/ne10/NE10.h>
+//#include <libraries/Midi/Midi.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #define BUFFER_SIZE (16384)
 
@@ -76,6 +77,14 @@ AuxiliaryTask gFFTTask;
 int gFFTInputBufferPointer = 0;
 int gFFTOutputBufferPointer = 0;
 
+// cpu cycle read
+static inline uint32_t ccnt_read (void)
+{
+  uint32_t cc = 0;
+  __asm__ volatile ("mrc p15, 0, %0, c9, c13, 0":"=r" (cc));
+  return cc;
+}
+
 // instantiate the scope
 //Scope scope;
 
@@ -97,7 +106,7 @@ bool setup(BelaContext* context, void* userData)
         return false;
     }
 
-    gFFTScaleFactor = 1.0f / (float)gFFTSize;
+    gFFTScaleFactor =  (float) Hs/ (float)gFFTSize;
     gOutputBufferWritePointer = Hs;
     gOutputBufferReadPointer = 0;
 
@@ -174,6 +183,11 @@ float princarg(float phase){
 // This function handles the FFT based pitch shifting processing
 void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, int outWritePointer)
 {
+
+    uint32_t t0 = ccnt_read();
+    uint32_t t1 = t0;//ccnt_read();       
+    //rt_printf("%u\n", t1-t0);
+
     // Copy buffer into FFT input
     int pointer = (inWritePointer - gFFTSize + BUFFER_SIZE) % BUFFER_SIZE;
     for(int n = 0; n < gFFTSize; n++) {
@@ -214,8 +228,8 @@ void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, 
     {
         //rt_printf("psi reset cause pitch_offset changed from %d to %d\n", prevPitch, pitch);
         prevPitch = pitch;
-        memset(phi0, 0, sizeof(phi0));
-        memset(psi, 0, sizeof(psi));
+        memset(phi0, 0, sizeof(gFFTSize * sizeof(float)));
+        memset(psi, 0, sizeof(gFFTSize * sizeof(float)));
     }
     
     tstretch = (float)(Ha+pitch)/(float)Hs;
@@ -231,10 +245,10 @@ void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, 
     }
     ne10_fft_c2c_1d_float32_neon (timeDomainOut, frequencyDomain, cfg, 1);
     //y1_[n] = fftshift(real(ifft(Y1_, N))) .* w[n]';
-    if(pitch){
-        for(int n = 0; n < gFFTSize; n++) {
-            timeDomainOut[n].r = timeDomainOut[n].r * gWindowBuffer[n];
-        }
+
+    for(int n = 0; n < gFFTSize; n++)
+    {
+        timeDomainOut[n].r = timeDomainOut[n].r * gWindowBuffer[n];
     }
 
 /*
@@ -260,7 +274,7 @@ grain3 = grain2(ix) .* dx1 + grain2(ix1) .* dx;
         int ix1 = ix+1;
         float dx = x-(float)ix;
         float dx1 = 1.0f-dx;
-        outBuffer[pointer] += (timeDomainOut[ix].r * dx1 + timeDomainOut[ix1].r * dx);
+        outBuffer[pointer] += gFFTScaleFactor*(timeDomainOut[ix].r * dx1 + timeDomainOut[ix1].r * dx);
         //outBuffer[pointer] += (timeDomainOut[n].r);// * gFFTScaleFactor;
         //if(timeDomainOut[n].i != 0)
         //    rt_printf("timeDomainOut[n].i not zero \n");        
@@ -270,6 +284,9 @@ grain3 = grain2(ix) .* dx1 + grain2(ix1) .* dx;
         if(pointer >= BUFFER_SIZE)
             pointer = 0;
     }
+
+    t1 = ccnt_read();
+    rt_printf("\rpitch = %d ####  %u cycles process", pitch, t1-t0);
 }
 
 // Function to process the FFT in a thread at lower priority
@@ -282,9 +299,35 @@ void render(BelaContext *context, void *userData)
     // iterate over the audio frames and create three oscillators, seperated in phase by PI/2
     for(unsigned int n = 0; n < context->audioFrames; n++) {
         if(gAudioFramesPerAnalogFrame && !(n % gAudioFramesPerAnalogFrame)) {
-            // read analog inputs and update pitch value
-            pitch = (int)floor(map(analogRead(context, n/gAudioFramesPerAnalogFrame, gAnalogIn), 0, 1, -200, 200));
-            //pitch = 0;
+			if(n==0)
+			{
+				// read analog inputs and update pitch value
+				pitch = (int)map(analogRead(context, n/gAudioFramesPerAnalogFrame, gAnalogIn), 0, 1, -200, 200);
+				if(pitch < 0)
+				{
+					if(pitch <= prevPitch-10)
+					{
+						prevPitch -= 10;
+					}
+                    else if(pitch >= prevPitch+10)
+                    {
+                        prevPitch += 10;
+                    }
+				}
+				else
+				{
+					if(pitch >= prevPitch+10)
+					{
+						prevPitch += 10;
+					}
+                    else if(pitch <= prevPitch-10)
+                    {
+                        prevPitch -= 10;
+                    }
+				}
+
+                pitch = prevPitch;
+			}
         }
 
         // Read audio inputs
