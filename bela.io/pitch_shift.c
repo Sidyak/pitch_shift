@@ -46,6 +46,7 @@ float tstretch = 1.0f;
 float resample = 1.0f;
 int pitch = 0;
 int prevPitch = 0;
+int modPitch = 0;
 int lx;
 
 float gFFTScaleFactor = 0;
@@ -228,8 +229,14 @@ void process_pitch_shift(float *inBuffer, int inWritePointer, float *outBuffer, 
     {
         //rt_printf("psi reset cause pitch_offset changed from %d to %d\n", prevPitch, pitch);
         prevPitch = pitch;
-        memset(phi0, 0, sizeof(gFFTSize * sizeof(float)));
-        memset(psi, 0, sizeof(gFFTSize * sizeof(float)));
+        // CAUTION: memset does not seem to work
+        //memset(phi0, 0, sizeof(gFFTSize * sizeof(float)));
+        //memset(psi, 0, sizeof(gFFTSize * sizeof(float)));
+        for(int n = 0; n < gFFTSize; n++)
+        {
+            phi0[n] = 0;
+            psi[n] = 0;
+        }
     }
     
     tstretch = (float)(Ha+pitch)/(float)Hs;
@@ -305,28 +312,28 @@ void render(BelaContext *context, void *userData)
 				pitch = (int)map(analogRead(context, n/gAudioFramesPerAnalogFrame, gAnalogIn), 0, 1, -200, 200);
 				if(pitch < 0)
 				{
-					if(pitch <= prevPitch-10)
+					if(pitch <= modPitch-10)
 					{
-						prevPitch -= 10;
+						modPitch -= 10;
 					}
-                    else if(pitch >= prevPitch+10)
+                    else if(pitch >= modPitch+10)
                     {
-                        prevPitch += 10;
+                        modPitch += 10;
                     }
 				}
 				else
 				{
-					if(pitch >= prevPitch+10)
+					if(pitch >= modPitch+10)
 					{
-						prevPitch += 10;
+						modPitch += 10;
 					}
-                    else if(pitch <= prevPitch-10)
+                    else if(pitch <= modPitch-10)
                     {
-                        prevPitch -= 10;
+                        modPitch -= 10;
                     }
 				}
 
-                pitch = prevPitch;
+                pitch = modPitch;
 			}
         }
 
